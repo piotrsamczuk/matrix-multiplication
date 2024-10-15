@@ -63,24 +63,23 @@ int main()
 {
     const std::vector<int> sizes = {100, 500, 1000, 2000}; // Rozmiary macierzy do testów
 
-    for (int size : sizes)
+    for (const int& size : sizes)
     {
-        auto A = generateMatrix(size, size);
-        auto B = generateMatrix(size, size);
+        const auto A = generateMatrix(size, size);
+        const auto B = generateMatrix(size, size);
 
-        auto start = std::chrono::high_resolution_clock::now();
-        auto C = multiplyMatrices(A, B);
-        auto end = std::chrono::high_resolution_clock::now();
+        const auto start = std::chrono::high_resolution_clock::now();
+        const auto C = multiplyMatrices(A, B);
+        const auto end = std::chrono::high_resolution_clock::now();
 
-        std::chrono::duration<double> elapsed = end - start;
+        const std::chrono::duration<double> elapsed = end - start;
 
         // Przybliżone zużycie pamięci (w MB)
-        double memory = (3 * size * size * sizeof(double)) / (1024.0 * 1024.0);
+        const double memory = (3 * size * size * sizeof(double)) / (1024.0 * 1024.0);
 
-        std::cout << "Rozmiar macierzy: " << size << "x" << size << std::endl;
-        std::cout << "Czas wykonania: " << elapsed.count() << " s" << std::endl;
-        std::cout << "Zużycie pamięci: " << std::fixed << std::setprecision(2) << memory << " MB" << std::endl
-                  << std::endl;
+        std::cout << "Matrix size: " << size << "x" << size << std::endl;
+        std::cout << "Execution time: " << elapsed.count() << " s" << std::endl;
+        std::cout << "Used memory: " << std::fixed << std::setprecision(2) << memory << " MB" << std::endl << std::endl;
 
         saveResultsToCSV("results.csv", size, elapsed.count(), memory);
     }
