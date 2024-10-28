@@ -1,26 +1,9 @@
+#include "matrix_mpi.hpp"
 #include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <random>
 #include <vector>
-
-std::vector<std::vector<double>> generateMatrix(int rows, int cols)
-{
-    std::random_device rd;  // seed
-    std::mt19937 gen(rd()); // Mersenne Twister
-    std::uniform_real_distribution<> dis(0.0, 1.0);
-
-    std::vector<std::vector<double>> matrix(rows, std::vector<double>(cols));
-    for (int i = 0; i < rows; ++i)
-    {
-        for (int j = 0; j < cols; ++j)
-        {
-            matrix[i][j] = dis(gen);
-        }
-    }
-    return matrix;
-}
 
 std::vector<std::vector<double>> multiplyMatrices(const std::vector<std::vector<double>>& A,
                                                   const std::vector<std::vector<double>>& B)
@@ -59,34 +42,72 @@ void saveResultsToCSV(const std::string& filename, int size, double time, double
     }
 }
 
+void projectProcedure(const int size, const std::string& filename)
+{
+    const auto A = generateMatrix(size, size);
+    const auto B = generateMatrix(size, size);
+
+    const auto start = std::chrono::high_resolution_clock::now();
+    const auto C = multiplyMatrices(A, B);
+    const auto end = std::chrono::high_resolution_clock::now();
+
+    const std::chrono::duration<double> elapsed = end - start;
+
+    // Przybliżone zużycie pamięci [B -> MB], może użyć Valgrind?
+    // 3 * size * size, bo mamy 3 macierze dwuwymiarowe: A, B, C
+    const double memory = (3 * size * size * sizeof(double)) / (1024.0 * 1024.0);
+
+    std::cout << "Matrix size: " << size << "x" << size << std::endl;
+    std::cout << "Execution time: " << elapsed.count() << " s" << std::endl;
+    std::cout << "Used memory: " << std::fixed << std::setprecision(2) << memory << " MB" << std::endl << std::endl;
+
+    saveResultsToCSV(filename, size, elapsed.count(), memory);
+}
+
 int main()
 {
-    const std::vector<int> sizes = {100, 500, 1000}; // Rozmiary macierzy do testów
-    constexpr auto cardinality = 1;                  // 500-1000
-    for (int size = 10; size < 1000; size++)
-    // for (const int& size : sizes)
+    // // Inicjalizacja MPI
+    // MPI_Init(&argc, &argv);
+    // int rank;
+    // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    const auto cardinality = 500;
+    const std::vector<int> sizes = {100, 250, 500};
+
+    // Kod dla wersji sekwencyjnej (wykonywany tylko przez proces główny)
+    // if(rank == 0)
+    if (0 == 0)
     {
-        for (int i = 0; i < cardinality; i++)
+        for (const int& size : sizes)
         {
-            const auto A = generateMatrix(size, size);
-            const auto B = generateMatrix(size, size);
+            for (int i = 0; i < cardinality; i++)
+            {
+                projectProcedure(size, "histogram.csv");
+            }
+        }
 
-            const auto start = std::chrono::high_resolution_clock::now();
-            const auto C = multiplyMatrices(A, B);
-            const auto end = std::chrono::high_resolution_clock::now();
-
-            const std::chrono::duration<double> elapsed = end - start;
-
-            // Przybliżone zużycie pamięci [B -> MB], może użyć Valgrind?
-            const double memory = (3 * size * size * sizeof(double)) / (1024.0 * 1024.0);
-
-            std::cout << "Matrix size: " << size << "x" << size << std::endl;
-            std::cout << "Execution time: " << elapsed.count() << " s" << std::endl;
-            std::cout << "Used memory: " << std::fixed << std::setprecision(2) << memory << " MB" << std::endl
-                      << std::endl;
-
-            saveResultsToCSV("results.csv", size, elapsed.count(), memory);
+        for (int size = 10; size < cardinality; size++)
+        {
+            projectProcedure(size, "log.csv");
         }
     }
+
+    // // Kod dla wersji rozproszonej (wykonywany przez wszystkie procesy)
+    // MPI_Barrier(MPI_COMM_WORLD); // Synchronizacja przed rozpoczęciem testów MPI
+
+    // for (const int& size : sizes)
+    // {
+    //     for (int i = 0; i < cardinality; i++)
+    //     {
+    //         projectProcedureMPI(size, "histogram_distributed.csv");
+    //     }
+    // }
+
+    // for (int size = 10; size < cardinality; size++)
+    // {
+    //     projectProcedureMPI(size, "log_distributed.csv");
+    // }
+
+    // MPI_Finalize();
     return 0;
 }

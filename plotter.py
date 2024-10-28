@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Wczytaj dane z pliku CSV
-data = pd.read_csv('results.csv', names=['size', 'time', 'memory'])
+data = pd.read_csv("log.csv", names=['size', 'time', 'memory'])
 
 # Ustawienia stylów
 sns.set_theme(style="darkgrid")
@@ -28,7 +28,6 @@ plt.tight_layout()
 
 # Zapisanie wykresu liniowego
 plt.savefig('matrix_multiplication_results.png', dpi=300)
-plt.show()
 
 # Dodatkowa analiza - korelacja
 correlation = data['size'].corr(data['time'])
@@ -51,4 +50,3 @@ plt.title('Wykres log-log: Czas wykonania vs Rozmiar macierzy')
 plt.xlabel('Rozmiar macierzy (log scale)')
 plt.ylabel('Czas wykonania (s) (log scale)')
 plt.savefig('log_log_plot.png', dpi=300)
-plt.show()
