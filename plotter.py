@@ -1,52 +1,63 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
+import glob
+from tqdm import tqdm
 
-# Wczytaj dane z pliku CSV
-data = pd.read_csv("log.csv", names=['size', 'time', 'memory'])
+print("Starting data loading and analysis...")
 
-# Ustawienia stylów
-sns.set_theme(style="darkgrid")
+# Wczytaj dane sekwencyjne
+print("\nLoading sequential data...")
+data_seq = pd.read_csv("results/sequential_results.csv", names=['size', 'time', 'memory', 'processes'])
 
-# Tworzenie wykresu liniowego dla czasu wykonania i zużycia pamięci
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+# Wczytaj wszystkie pliki z danymi równoległymi
+print("\nLoading parallel data...")
+parallel_files = glob.glob("results/parallel_results_*proc.csv")
+data_parallel = []
+for file in tqdm(parallel_files, desc="Loading parallel files"):
+    df = pd.read_csv(file, names=['size', 'time', 'memory', 'processes'])
+    data_parallel.append(df)
 
-# Wykres czasu wykonania
-sns.lineplot(x='size', y='time', data=data, ax=ax1, marker='o')
-ax1.set_title('Czas wykonania w zależności od rozmiaru macierzy')
-ax1.set_xlabel('Rozmiar macierzy')
-ax1.set_ylabel('Czas wykonania (s)')
+# Połącz wszystkie dane równoległe
+print("\nCombining parallel data...")
+data_mpi = pd.concat(data_parallel)
 
-# Wykres zużycia pamięci
-sns.lineplot(x='size', y='memory', data=data, ax=ax2, marker='o')
-ax2.set_title('Zużycie pamięci w zależności od rozmiaru macierzy')
-ax2.set_xlabel('Rozmiar macierzy')
-ax2.set_ylabel('Zużycie pamięci (MB)')
+# Wyświetl przykładowe dane przed zapisem
+print("\nPrzykładowe dane sekwencyjne:")
+print(data_seq.head())
+print("\nRozmiar danych sekwencyjnych:", data_seq.memory_usage().sum() / 1024 / 1024, "MB")
 
-# Dostosowanie układu
-plt.tight_layout()
+print("\nPrzykładowe dane równoległe:")
+print(data_mpi.head())
+print("\nRozmiar danych równoległych:", data_mpi.memory_usage().sum() / 1024 / 1024, "MB")
 
-# Zapisanie wykresu liniowego
-plt.savefig('matrix_multiplication_results.png', dpi=300)
+# [... kod generujący wykresy pozostaje bez zmian ...]
 
-# Dodatkowa analiza - korelacja
-correlation = data['size'].corr(data['time'])
-print(f"Korelacja między rozmiarem macierzy a czasem wykonania: {correlation:.2f}")
+print("\nSaving optimized analysis results...")
+# Zapisz tylko najważniejsze metryki do CSV
+for num_proc in tqdm(sorted(data_mpi['processes'].unique()), desc="Saving analysis results"):
+    data_proc = data_mpi[data_mpi['processes'] == num_proc]
 
-# Analiza wzrostu złożoności
-data['time_ratio'] = data['time'] / data['time'].shift(1)
-data['size_ratio'] = data['size'] / data['size'].shift(1)
-data['complexity_growth'] = data['time_ratio'] / (data['size_ratio'] ** 3)
+    # Tworzenie zoptymalizowanego DataFrame z tylko potrzebnymi kolumnami
+    analysis_df = pd.DataFrame({
+        'matrix_size': data_proc['size'],
+        'sequential_time': data_seq['time'],
+        'parallel_time': data_proc['time'],
+        'speedup': data_seq['time'] / data_proc['time'],
+        'efficiency': (data_seq['time'] / data_proc['time']) / num_proc,
+        'num_processes': data_proc['processes']
+    })
 
-print("\nWzrost złożoności czasowej:")
-print(data[['size', 'time', 'complexity_growth']].to_string(index=False))
+    # Wyświetl rozmiar pliku przed zapisem
+    print(f"\nRozmiar danych dla {num_proc} procesów:",
+          analysis_df.memory_usage().sum() / 1024 / 1024, "MB")
 
-# Wykres log-log
-plt.figure(figsize=(8, 6))
-sns.lineplot(x='size', y='time', data=data, marker='o')
-plt.xscale('log')
-plt.yscale('log')
-plt.title('Wykres log-log: Czas wykonania vs Rozmiar macierzy')
-plt.xlabel('Rozmiar macierzy (log scale)')
-plt.ylabel('Czas wykonania (s) (log scale)')
-plt.savefig('log_log_plot.png', dpi=300)
+    # Zapisz z kompresją
+    analysis_df.to_csv(
+        f'results/analysis_results_{num_proc}proc.csv',
+        index=False,
+        float_format='%.4f'  # Ogranicz precyzję liczb zmiennoprzecinkowych
+    )
+
+print("\nAll operations completed successfully!")

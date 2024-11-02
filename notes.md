@@ -1,0 +1,3 @@
+- Eksperymenty dla 1,2,4,6 procesow mpi (0 jest dla sekwencyjnego), sprobowac dla 8 i 12 (hyperthreading)
+- Wiecej rozmiarow macierzy i wiekszy rozstrzal (10-100 i do 1000 max)
+- Prawa Gustaffssona i Amdahla

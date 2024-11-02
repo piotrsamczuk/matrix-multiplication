@@ -74,7 +74,6 @@ std::vector<double> multiplyMatrixPortion(const std::vector<double>& A_portion, 
     return C_portion;
 }
 
-// Główna funkcja do rozproszonego mnożenia macierzy
 std::vector<std::vector<double>> multiplyMatricesMPI(const std::vector<std::vector<double>>& A,
                                                      const std::vector<std::vector<double>>& B)
 {
@@ -82,13 +81,29 @@ std::vector<std::vector<double>> multiplyMatricesMPI(const std::vector<std::vect
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &num_processes);
 
-    int rows = A.size();
-    int cols = B[0].size();
-    int inner_dim = A[0].size();
+    // Broadcast matrix dimensions
+    int rows, cols, inner_dim;
+    if (rank == 0)
+    {
+        rows = A.size();
+        inner_dim = A[0].size();
+        cols = B[0].size();
+    }
+    MPI_Bcast(&rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&inner_dim, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    // Konwersja macierzy wejściowych do formatu 1D
-    std::vector<double> flat_A = convertTo1D(A);
-    std::vector<double> flat_B = convertTo1D(B);
+    // Convert matrices to 1D only on rank 0
+    std::vector<double> flat_A, flat_B;
+    if (rank == 0)
+    {
+        flat_A = convertTo1D(A);
+        flat_B = convertTo1D(B);
+    }
+    else
+    {
+        flat_B.resize(inner_dim * cols); // All processes need B
+    }
 
     // Obliczenie rozmiaru porcji dla każdego procesu
     int basic_rows_per_process = rows / num_processes;
@@ -122,7 +137,7 @@ std::vector<std::vector<double>> multiplyMatricesMPI(const std::vector<std::vect
     // Mnożenie przydzielonej części
     std::vector<double> my_C_portion = multiplyMatrixPortion(my_A_portion, flat_B, my_portion_rows, cols, inner_dim);
 
-    // Przygotowanie buforów na wyniki
+    // Update sendcounts and displs for gathering results
     for (int i = 0; i < num_processes; ++i)
     {
         sendcounts[i] = (basic_rows_per_process + (i < remainder ? 1 : 0)) * cols;
@@ -162,6 +177,12 @@ void projectProcedureMPI(const int size, const std::string& filename)
     {
         A = generateMatrix(size, size);
         B = generateMatrix(size, size);
+    }
+    else
+    {
+        // Initialize empty matrices for other ranks
+        A.resize(size, std::vector<double>(size));
+        B.resize(size, std::vector<double>(size));
     }
 
     // Synchronizacja wszystkich procesów przed rozpoczęciem
