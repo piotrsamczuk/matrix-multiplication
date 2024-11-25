@@ -40,6 +40,9 @@ for num_proc in tqdm(sorted(data_mpi['processes'].unique()), desc="Saving analys
     data_proc = data_mpi[data_mpi['processes'] == num_proc]
 
     # Tworzenie zoptymalizowanego DataFrame z tylko potrzebnymi kolumnami
+
+    ### ZMIENIC LOSOWE LICZBY W DATAFRAME NA SREDNIA/MINIMUM/MEDIANE 
+
     analysis_df = pd.DataFrame({
         'matrix_size': data_proc['size'],
         'sequential_time': data_seq['time'],

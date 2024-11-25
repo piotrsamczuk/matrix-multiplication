@@ -73,7 +73,7 @@ int main(int argc, char* argv[])
     const int repetitions = 1000;
 
     // Wersja sekwencyjna (tylko dla procesu głównego gdy num_processes == 1)
-    if (rank == 0 && num_processes == 1)
+    if (rank == 0 and num_processes == 1)
     {
         std::cout << "Running sequential tests..." << std::endl;
         for (const int& size : matrix_sizes)
