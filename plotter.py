@@ -22,12 +22,35 @@ for file in tqdm(parallel_files, desc="Loading parallel files"):
 print("\nCombining parallel data...")
 data_mpi = pd.concat(data_parallel)
 
-print("\nSaving optimized analysis results...")
-# Save only key metrics to CSV
-for num_proc in tqdm(sorted(data_mpi['processes'].unique()), desc="Saving analysis results"):
-    data_proc = data_mpi[data_mpi['processes'] == num_proc]
+# Comprehensive analysis and plotting
+print("\nPerforming comprehensive analysis...")
+unique_processes = sorted(data_mpi['processes'].unique())
 
-    # Compute median values for each size
+# Prepare figure for comprehensive comparison
+plt.figure(figsize=(15, 10))
+
+# Speedup subplot
+plt.subplot(2, 1, 1)
+plt.title('Speedup Comparison Across Different Process Counts', fontsize=14)
+plt.xlabel('Matrix Size', fontsize=12)
+plt.ylabel('Speedup', fontsize=12)
+plt.grid(True, linestyle='--', alpha=0.7)
+
+# Efficiency subplot
+plt.subplot(2, 1, 2)
+plt.title('Efficiency Comparison Across Different Process Counts', fontsize=14)
+plt.xlabel('Matrix Size', fontsize=12)
+plt.ylabel('Efficiency', fontsize=12)
+plt.grid(True, linestyle='--', alpha=0.7)
+
+# Color palette for different process counts
+colors = plt.cm.rainbow(np.linspace(0, 1, len(unique_processes)))
+
+for num_proc, color in zip(unique_processes, colors):
+    # Filter data for specific process count
+    data_proc = data_mpi[data_mpi['processes'] == num_proc]
+    
+    # Compute analysis data
     analysis_data = []
     for size in sorted(data_seq['size'].unique()):
         seq_times = data_seq[data_seq['size'] == size]['time']
@@ -41,41 +64,32 @@ for num_proc in tqdm(sorted(data_mpi['processes'].unique()), desc="Saving analys
         
         analysis_data.append({
             'matrix_size': size,
-            'sequential_time': median_seq_time,
-            'parallel_time': median_parallel_time,
             'speedup': speedup,
-            'efficiency': efficiency,
-            'num_processes': num_proc
+            'efficiency': efficiency
         })
 
     analysis_df = pd.DataFrame(analysis_data)
 
-    # Save with compression
-    analysis_df.to_csv(
-        f'results/analysis_results_{num_proc}proc.csv',
-        index=False,
-        float_format='%.4f'
-    )
+    # Plot speedup
+    plt.subplot(2, 1, 1)
+    plt.plot(analysis_df['matrix_size'], analysis_df['speedup'], 
+             marker='o', label=f'{num_proc} Processes', color=color)
 
-    # Create speedup and efficiency plots
-    plt.figure(figsize=(12, 5))
-    
-    plt.subplot(1, 2, 1)
-    plt.plot(analysis_df['matrix_size'], analysis_df['speedup'], marker='o')
-    plt.title(f'Speedup ({num_proc} Processes)')
-    plt.xlabel('Matrix Size')
-    plt.ylabel('Speedup')
-    plt.grid(True)
+    # Plot efficiency
+    plt.subplot(2, 1, 2)
+    plt.plot(analysis_df['matrix_size'], analysis_df['efficiency'], 
+             marker='o', label=f'{num_proc} Processes', color=color)
 
-    plt.subplot(1, 2, 2)
-    plt.plot(analysis_df['matrix_size'], analysis_df['efficiency'], marker='o')
-    plt.title(f'Efficiency ({num_proc} Processes)')
-    plt.xlabel('Matrix Size')
-    plt.ylabel('Efficiency')
-    plt.grid(True)
+# Add legends
+plt.subplot(2, 1, 1)
+plt.legend(title='Process Counts', loc='best')
 
-    plt.tight_layout()
-    plt.savefig(f'pictures/speedup_efficiency_{num_proc}proc.png')
-    plt.close()
+plt.subplot(2, 1, 2)
+plt.legend(title='Process Counts', loc='best')
 
-print("\nAll operations completed successfully!")
+# Adjust layout and save
+plt.tight_layout()
+plt.savefig('pictures/comprehensive_speedup_efficiency_comparison.png', dpi=300)
+plt.close()
+
+print("\nComprehensive comparison plot created successfully!")

@@ -70,7 +70,7 @@ int main(int argc, char* argv[])
 
     // Definicja parametrów eksperymentu
     const std::vector<int> matrix_sizes = {20, 50, 100, 200, 500, 700};
-    const int repetitions = 1000;
+    const int repetitions = 100;
 
     // Wersja sekwencyjna (tylko dla procesu głównego gdy num_processes == 1)
     if (rank == 0 and num_processes == 1)
