@@ -1,87 +1,86 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 import os
 import glob
+import numpy as np
 
 def create_histograms(filename, output_prefix):
-    # Sprawdź czy plik istnieje
+    # Check if file exists
     if not os.path.exists(filename):
-        print(f"Plik {filename} nie istnieje!")
+        print(f"File {filename} does not exist!")
         return
 
-    # Wczytaj dane z pliku CSV
+    # Read CSV data
     data = pd.read_csv(filename, names=['size', 'time', 'memory', 'processes'])
 
-    # Pobierz unikalne rozmiary macierzy i liczby procesów
+    # Get unique matrix sizes and process counts
     sizes = sorted(data['size'].unique())
     processes = sorted(data['processes'].unique())
 
-    # Ustawienia stylu dla wszystkich wykresów
-    sns.set_theme(style="darkgrid")
-    plt.rcParams.update({'font.size': 12})
+    # Style settings for all plots
+    plt.style.use('default')  # Prosty, domyślny styl
+    plt.rcParams.update({
+        'font.size': 12,
+        'grid.linestyle': ':',
+        'grid.color': 'gray',
+        'grid.alpha': 0.7
+    })
 
-    # Dla każdego rozmiaru macierzy
+    # For each matrix size
     for size in sizes:
-        # Filtruj dane dla danego rozmiaru
+        # Filter data for specific size
         size_data = data[data['size'] == size]
 
-        # Jeśli to dane sekwencyjne (processes == 0) lub równoległe
-        if len(processes) == 1:
-            # Twórz nowy wykres
-            plt.figure(figsize=(10, 6))
+        # Create new figure
+        plt.figure(figsize=(10, 6))
 
-            # Twórz histogram czasu wykonania z logarytmicznym skalowaniem osi Y
-            sns.histplot(data=size_data, x='time', bins=30, kde=True)
-            plt.yscale('log')  # Dodane skalowanie logarytmiczne osi Y
+        # Convert time to milliseconds
+        time_ms = size_data['time'] * 1000  # Convert to milliseconds
+        
+         # Create histogram with logarithmic y-scale 
+        plt.hist(time_ms, bins=30, edgecolor='black', alpha=0.7)
+        plt.yscale('log')  # Logarithmic y-axis
+        
+        # Set y-axis to start from 0
+        plt.ylim(bottom=0)
+        
+        # Add gridlines
+        plt.grid(True, which='major', linestyle='-', linewidth=0.8, color='black', alpha=0.8)
+        plt.grid(True, which='minor', linestyle=':', linewidth=0.5, color='gray', alpha=0.6)
+        
+        # Scientific notation for x-axis
+        plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
 
-            # Opcjonalnie można też dodać skalowanie logarytmiczne osi X
-            if size_data['time'].max() / size_data['time'].min() > 10:
-                plt.xscale('log')
+        num_processes = size_data['processes'].iloc[0]
+        version_info = "Sequential" if num_processes == 0 else f"Parallel ({num_processes} processes)"
 
-            # Dodaj średnią jako pionową linię
-            mean_time = size_data['time'].mean()
-            plt.axvline(mean_time, color='red', linestyle='--',
-                       label=f'Średnia: {mean_time:.4f}s')
+        plt.title(f'Execution Time Distribution for {size}x{size} Matrix\n'
+                  f'{version_info}')
 
-            # Dodaj informacje o pamięci do tytułu
-            mean_memory = size_data['memory'].mean()
-            num_processes = size_data['processes'].iloc[0]
+        plt.xlabel('Execution Time (ms)')
+        plt.ylabel('Frequency')
 
-            if num_processes == 0:
-                version_info = "Wersja sekwencyjna"
-            else:
-                version_info = f"Liczba procesów: {num_processes}"
+        # Save plot
+        output_name = f'{output_prefix}_size_{size}'
+        if num_processes > 0:
+            output_name += f'_proc_{num_processes}'
+        plt.savefig(f'pictures/{output_name}.png', dpi=300, bbox_inches='tight')
+        plt.close()
 
-            plt.title(f'Histogram czasu wykonania dla macierzy {size}x{size}\n'
-                     f'{version_info}, Średnie zużycie pamięci: {mean_memory:.2f} MB\n'
-                     f'(skala logarytmiczna)')
-
-            plt.xlabel('Czas wykonania (s)')
-            plt.ylabel('Liczba wystąpień (skala log)')
-            plt.legend()
-
-            # Zapisz wykres
-            output_name = f'{output_prefix}_size_{size}'
-            if num_processes > 0:
-                output_name += f'_proc_{num_processes}'
-            plt.savefig(f'pictures/{output_name}.png', dpi=300, bbox_inches='tight')
-            plt.close()
-
-            print(f"Utworzono histogram dla rozmiaru {size}x{size}" +
-                  (f" i {num_processes} procesów" if num_processes > 0 else ""))
+        print(f"Created histogram for size {size}x{size}" +
+              (f" with {num_processes} processes" if num_processes > 0 else ""))
 
 def main():
-    # Utwórz histogramy dla wersji sekwencyjnej
+    # Create histograms for sequential version
     create_histograms('results/sequential_results.csv', 'sequential')
 
-    # Utwórz histogramy dla wszystkich plików z wersji równoległej
+    # Create histograms for all parallel files
     parallel_files = glob.glob("results/parallel_results_*proc.csv")
     for file in parallel_files:
         output_prefix = f"parallel_{os.path.basename(file).split('.')[0]}"
         create_histograms(file, output_prefix)
 
-    print("\nAnaliza zakończona!")
+    print("\nAnalysis completed!")
 
 if __name__ == "__main__":
     main()
