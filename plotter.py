@@ -1,8 +1,10 @@
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.graph_objs as go
+import plotly.io as pio
 import numpy as np
 import glob
 from tqdm import tqdm
+import matplotlib.cm as cm
 
 print("Starting data loading and analysis...")
 
@@ -22,74 +24,171 @@ for file in tqdm(parallel_files, desc="Loading parallel files"):
 print("\nCombining parallel data...")
 data_mpi = pd.concat(data_parallel)
 
-# Comprehensive analysis and plotting
-print("\nPerforming comprehensive analysis...")
+# Unique processes for color mapping
 unique_processes = sorted(data_mpi['processes'].unique())
+colors = [f'rgb({int(r*255)},{int(g*255)},{int(b*255)})' for r,g,b,_ in cm.rainbow(np.linspace(0, 1, len(unique_processes)))]
 
-# Prepare figure for comprehensive comparison
-plt.figure(figsize=(15, 10))
-
-# Speedup subplot
-plt.subplot(2, 1, 1)
-plt.title('Speedup Comparison Across Different Process Counts', fontsize=14)
-plt.xlabel('Matrix Size', fontsize=12)
-plt.ylabel('Speedup', fontsize=12)
-plt.grid(True, linestyle='--', alpha=0.7)
-
-# Efficiency subplot
-plt.subplot(2, 1, 2)
-plt.title('Efficiency Comparison Across Different Process Counts', fontsize=14)
-plt.xlabel('Matrix Size', fontsize=12)
-plt.ylabel('Efficiency', fontsize=12)
-plt.grid(True, linestyle='--', alpha=0.7)
-
-# Color palette for different process counts
-colors = plt.cm.rainbow(np.linspace(0, 1, len(unique_processes)))
-
-for num_proc, color in zip(unique_processes, colors):
-    # Filter data for specific process count
-    data_proc = data_mpi[data_mpi['processes'] == num_proc]
+# Function to create performance traces
+def create_performance_traces(data_seq, data_mpi, metric, log_scale=False):
+    traces = []
+    for i, num_proc in enumerate(unique_processes):
+        # Filter data for specific process count
+        data_proc = data_mpi[data_mpi['processes'] == num_proc]
+        
+        # Compute analysis data
+        analysis_data = []
+        for size in sorted(data_seq['size'].unique()):
+            seq_data = data_seq[data_seq['size'] == size]
+            parallel_data = data_proc[data_proc['size'] == size]
+            
+            if metric == 'speedup':
+                median_seq_time = np.median(seq_data['time'])
+                median_parallel_time = np.median(parallel_data['time'])
+                value = median_seq_time / median_parallel_time
+                y_label = 'Speedup'
+            elif metric == 'efficiency':
+                median_seq_time = np.median(seq_data['time'])
+                median_parallel_time = np.median(parallel_data['time'])
+                speedup = median_seq_time / median_parallel_time
+                value = (speedup / num_proc) * 100
+                y_label = 'Efficiency [%]'
+            elif metric == 'memory':
+                value = np.median(parallel_data['memory'])
+                y_label = 'Memory Usage [MB]'
+            elif metric == 'time':
+                value = np.median(parallel_data['time'])
+                y_label = 'Execution Time [s]'
+            
+            analysis_data.append({
+                'matrix_size': size,
+                'value': value
+            })
+        
+        analysis_df = pd.DataFrame(analysis_data)
+        
+        trace = go.Scatter(
+            x=analysis_df['matrix_size'],
+            y=analysis_df['value'],
+            mode='lines+markers',
+            name=f'{num_proc} Processes',
+            line=dict(color=colors[i]),
+            hovertemplate='Matrix Size: %{x}<br>Value: %{y:.4f}<extra></extra>'
+        )
+        traces.append(trace)
     
-    # Compute analysis data
-    analysis_data = []
-    for size in sorted(data_seq['size'].unique()):
-        seq_times = data_seq[data_seq['size'] == size]['time']
-        parallel_times = data_proc[data_proc['size'] == size]['time']
-        
-        median_seq_time = np.median(seq_times)
-        median_parallel_time = np.median(parallel_times)
-        
-        speedup = median_seq_time / median_parallel_time
-        efficiency = speedup / num_proc
-        
-        analysis_data.append({
-            'matrix_size': size,
-            'speedup': speedup,
-            'efficiency': efficiency
-        })
+    return traces, y_label
 
-    analysis_df = pd.DataFrame(analysis_data)
+# Comprehensive Performance Comparison
+def create_comprehensive_plot():
+    # Speedup plot
+    speedup_traces, speedup_label = create_performance_traces(data_seq, data_mpi, 'speedup')
+    
+    # Efficiency plot
+    efficiency_traces, efficiency_label = create_performance_traces(data_seq, data_mpi, 'efficiency')
+    
+    # Create subplot figure
+    fig = go.Figure()
+    
+    # Add speedup traces
+    for trace in speedup_traces:
+        fig.add_trace(trace)
+    
+    # Update layout for first subplot (Speedup)
+    fig.update_layout(
+        title='Speedup Comparison Across Different Process Counts',
+        xaxis_title='Matrix Size [n]',
+        yaxis_title=speedup_label,
+        height=600,
+        width=1000,
+        hovermode='closest'
+    )
+    
+    # Save speedup plot
+    pio.write_html(fig, file='pictures/speedup_comparison.html')
+    
+    # Create efficiency plot
+    fig = go.Figure()
+    
+    # Add efficiency traces
+    for trace in efficiency_traces:
+        fig.add_trace(trace)
+    
+    # Update layout for second subplot (Efficiency)
+    fig.update_layout(
+        title='Efficiency Comparison Across Different Process Counts',
+        xaxis_title='Matrix Size [n]',
+        yaxis_title=efficiency_label,
+        height=600,
+        width=1000,
+        hovermode='closest'
+    )
+    
+    # Save efficiency plot
+    pio.write_html(fig, file='pictures/efficiency_comparison.html')
 
-    # Plot speedup
-    plt.subplot(2, 1, 1)
-    plt.plot(analysis_df['matrix_size'], analysis_df['speedup'], 
-             marker='o', label=f'{num_proc} Processes', color=color)
+# Memory Usage Comparison
+def create_memory_plot():
+    # Memory usage traces
+    memory_traces, memory_label = create_performance_traces(data_seq, data_mpi, 'memory')
+    
+    # Create figure
+    fig = go.Figure()
+    
+    # Add memory traces
+    for trace in memory_traces:
+        fig.add_trace(trace)
+    
+    # Update layout
+    fig.update_layout(
+        title='Memory Usage Across Matrix Sizes',
+        xaxis_title='Matrix Size [n]',
+        yaxis_title=memory_label,
+        height=600,
+        width=1000,
+        hovermode='closest'
+    )
+    
+    # Save memory plot
+    pio.write_html(fig, file='pictures/memory_usage_comparison.html')
 
-    # Plot efficiency
-    plt.subplot(2, 1, 2)
-    plt.plot(analysis_df['matrix_size'], analysis_df['efficiency'], 
-             marker='o', label=f'{num_proc} Processes', color=color)
+# Execution Time Comparison (Log-Log Scale)
+def create_time_plot():
+    # Time traces 
+    time_traces, time_label = create_performance_traces(data_seq, data_mpi, 'time')
+    
+    # Create figure
+    fig = go.Figure()
+    
+    # Add time traces
+    for trace in time_traces:
+        fig.add_trace(trace)
+    
+    # Update layout with scientific notation
+    fig.update_layout(
+        title='Execution Time Comparison',
+        xaxis_title='Matrix Size [n]',
+        yaxis_title='Execution Time [ms]',  # Changed to milliseconds
+        height=600,
+        width=1000,
+        hovermode='closest'
+    )
+    
+    # Modify the traces to convert seconds to milliseconds
+    for trace in fig.data:
+        trace.y = [y * 1000 for y in trace.y]
+    
+    # Set y-axis to scientific notation for milliseconds
+    fig.update_yaxes(
+        tickformat='.2e',  # Scientific notation with 2 decimal places
+        exponentformat='power'  # Show exponent as power of 10
+    )
+    
+    # Save time plot
+    pio.write_html(fig, file='pictures/execution_time_comparison.html')
 
-# Add legends
-plt.subplot(2, 1, 1)
-plt.legend(title='Process Counts', loc='best')
+# Create all plots
+create_comprehensive_plot()
+create_memory_plot()
+create_time_plot()
 
-plt.subplot(2, 1, 2)
-plt.legend(title='Process Counts', loc='best')
-
-# Adjust layout and save
-plt.tight_layout()
-plt.savefig('pictures/comprehensive_speedup_efficiency_comparison.png', dpi=300)
-plt.close()
-
-print("\nComprehensive comparison plot created successfully!")
+print("\nInteractive performance comparison plots created successfully!")
