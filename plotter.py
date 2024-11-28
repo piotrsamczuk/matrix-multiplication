@@ -186,9 +186,113 @@ def create_time_plot():
     # Save time plot
     pio.write_html(fig, file='pictures/execution_time_comparison.html')
 
+# New function to create plots for speedup and efficiency versus number of processes
+def create_processes_performance_plots():
+    # Prepare data for different matrix sizes
+    matrix_sizes = sorted(data_seq['size'].unique())
+    
+    # Speedup vs Processes Plot
+    speedup_traces = []
+    for size in matrix_sizes:
+        speedup_data = []
+        
+        # Calculate speedup for each process count
+        for num_proc in unique_processes:
+            # Get sequential and parallel times for this matrix size
+            seq_time = np.median(data_seq[data_seq['size'] == size]['time'])
+            parallel_time = np.median(data_mpi[(data_mpi['size'] == size) & 
+                                               (data_mpi['processes'] == num_proc)]['time'])
+            
+            # Calculate speedup
+            speedup = seq_time / parallel_time if parallel_time > 0 else 0
+            
+            speedup_data.append({
+                'processes': num_proc,
+                'speedup': speedup
+            })
+        
+        # Convert to DataFrame
+        speedup_df = pd.DataFrame(speedup_data)
+        
+        # Create trace for this matrix size
+        trace = go.Scatter(
+            x=speedup_df['processes'],
+            y=speedup_df['speedup'],
+            mode='lines+markers',
+            name=f'Matrix Size {size}',
+            hovertemplate='Processes: %{x}<br>Speedup: %{y:.4f}<extra></extra>'
+        )
+        speedup_traces.append(trace)
+    
+    # Create speedup vs processes plot
+    fig_speedup = go.Figure(data=speedup_traces)
+    fig_speedup.update_layout(
+        title='Speedup vs Number of Processes',
+        xaxis_title='Number of Processes',
+        yaxis_title='Speedup',
+        height=600,
+        width=1000,
+        hovermode='closest'
+    )
+    pio.write_html(fig_speedup, file='pictures/speedup_vs_processes.html')
+    
+    # Efficiency vs Processes Plot
+    efficiency_traces = []
+    for size in matrix_sizes:
+        efficiency_data = []
+        
+        # Calculate efficiency for each process count
+        for num_proc in unique_processes:
+            # Get sequential and parallel times for this matrix size
+            seq_time = np.median(data_seq[data_seq['size'] == size]['time'])
+            parallel_time = np.median(data_mpi[(data_mpi['size'] == size) & 
+                                               (data_mpi['processes'] == num_proc)]['time'])
+            
+            # Calculate speedup and efficiency
+            speedup = seq_time / parallel_time if parallel_time > 0 else 0
+            efficiency = (speedup / num_proc) * 100 if num_proc > 0 else 0
+            
+            efficiency_data.append({
+                'processes': num_proc,
+                'efficiency': efficiency
+            })
+        
+        # Convert to DataFrame
+        efficiency_df = pd.DataFrame(efficiency_data)
+        
+        # Create trace for this matrix size
+        trace = go.Scatter(
+            x=efficiency_df['processes'],
+            y=efficiency_df['efficiency'],
+            mode='lines+markers',
+            name=f'Matrix Size {size}',
+            hovertemplate='Processes: %{x}<br>Efficiency: %{y:.2f}%<extra></extra>'
+        )
+        efficiency_traces.append(trace)
+    
+    # Create efficiency vs processes plot
+    fig_efficiency = go.Figure(data=efficiency_traces)
+    fig_efficiency.update_layout(
+        title='Efficiency vs Number of Processes',
+        xaxis_title='Number of Processes',
+        yaxis_title='Efficiency [%]',
+        height=600,
+        width=1000,
+        hovermode='closest'
+    )
+    pio.write_html(fig_efficiency, file='pictures/efficiency_vs_processes.html')
+
 # Create all plots
-create_comprehensive_plot()
-create_memory_plot()
-create_time_plot()
+def main():
+    create_comprehensive_plot()
+    create_memory_plot()
+    create_time_plot()
+    
+    # Add the new process-based performance plots
+    create_processes_performance_plots()
+
+# Execute the main function
+if __name__ == '__main__':
+    main()
 
 print("\nInteractive performance comparison plots created successfully!")

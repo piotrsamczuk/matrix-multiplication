@@ -8,24 +8,19 @@
 std::vector<std::vector<double>> multiplyMatrices(const std::vector<std::vector<double>>& A,
                                                   const std::vector<std::vector<double>>& B)
 {
-    int rowsA = A.size();
-    int colsA = A[0].size();
-    int colsB = B[0].size();
+    int rows = A.size();
+    int inner_dim = A[0].size();
+    int cols = B[0].size();
 
-    std::vector<std::vector<double>> C(rowsA, std::vector<double>(colsB, 0.0));
+    // Convert matrices to 1D
+    std::vector<double> flat_A = convertTo1D(A);
+    std::vector<double> flat_B = convertTo1D(B);
 
-    for (int i = 0; i < rowsA; ++i)
-    {
-        for (int j = 0; j < colsB; ++j)
-        {
-            for (int k = 0; k < colsA; ++k)
-            {
-                C[i][j] += A[i][k] * B[k][j];
-            }
-        }
-    }
+    // Multiply matrix portions (in this case, the entire matrix)
+    std::vector<double> flat_C = multiplyMatrixPortion(flat_A, flat_B, rows, cols, inner_dim);
 
-    return C;
+    // Convert result back to 2D
+    return convertTo2D(flat_C, rows, cols);
 }
 
 void saveResultsToCSV(const std::string& filename, int size, double time, double memory, int num_processes = 0)
